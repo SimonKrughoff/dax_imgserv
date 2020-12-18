@@ -88,11 +88,7 @@ class ImageSODA(DAL):
                 band = 'default'
             else:
                 database, datasetType, band = params['ID'].split('.')
-            shape, ra, dec, width, height, unit = params['POS'].split()
-            # This assumes that the width is in angular separation not delta Declination
-            size = max([width, height])
-            position = geom.SpherePoint(ra, dec)
-            cutout = get_image(datasetType, position, size, unit)
+            cutout = get_image(datasetType, params['POS'].split()[0], *params['POS'].split()[1:])
             return cutout
         else:
             raise NotImplementedError("ImageSODA.do_sync(): Unsupported "
