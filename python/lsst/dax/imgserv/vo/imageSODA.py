@@ -26,7 +26,7 @@ from flask import session
 import lsst.afw.image as afw_image
 
 from ..locateImage import get_image
-from .soda import SODA
+from .dal import DAL
 # use following format to prevent circular reference
 import lsst.dax.imgserv.jobqueue.imageworker as imageworker
 
@@ -39,13 +39,13 @@ import lsst.dax.imgserv.jobqueue.imageworker as imageworker
         RANGE <ra1> <ra2> <dec1> <dec2>
         POLYGON <ra1> <dec1> ... (at least 3 pairs)
         BBOX <ra> <dec> <w> <h> <filter> <unit>
-       
+
     The parameters are represented in `dict`, for example: 
         {'ID': 'DC_W13_Stripe82.calexp.r', 'CIRCLE 37.644598 0.104625 100'}
 """
 
 
-class ImageSODA(SODA):
+class ImageSODA(DAL):
     """ Class to handle SODA operations.
 
     """
@@ -82,14 +82,18 @@ class ImageSODA(SODA):
             the image object.
         """
         if "POS" in params:
-            resp = super().handle_pos(params)
-            if isinstance(resp, tuple):
-                # image object is first element of the tuple
-                return resp[0]
+            if "ID" not in params:
+                database = 'default'
+                dataset_id = 'default'
+                band = 'default'
             else:
-                return resp
-        elif "ID" in params:
-            return self.get_image_by_did(params)
+                database, datasetType, band = params['ID'].split('.')
+            shape, ra, dec, width, height, unit = params['POS'].split()
+            # This assumes that the width is in angular separation not delta Declination
+            size = max([width, height])
+            position = geom.SpherePoint(ra, dec)
+            cutout = get_image(datasetType, position, size, unit)
+            return cutout
         else:
             raise NotImplementedError("ImageSODA.do_sync(): Unsupported "
                                       "Request")
@@ -194,135 +198,3 @@ class ImageSODA(SODA):
         """
         return super().get_capabilities(params)
 
-    def handle_default(self, params: dict) -> afw_image:
-        """Dispatch to class specific methods """
-        shape = params["POS"].split()
-        if shape[0] == "BBOX":
-            return self.get_bbox(params)
-        elif shape[0] == "NA":
-            return self.get_image_by_did(params)
-        else:
-            raise TypeError("ImageSODA", "Unsupported shape", shape[0])
-
-    def get_image_by_did(self, params: dict) -> afw_image:
-        """ Retrieve image on its data id.
-
-        Parameters
-        ----------
-        params: `dict`
-            ID: <db><collection><ds>]
-                db: database identifer
-                collection: image collection
-                ds: dataset identifier, e.g. calexp.
-
-        Returns
-        -------
-        image : `lsst.afw.image`
-        """
-        image = get_image(params, self._config)
-        return image
-
-    def get_circle(self, params: dict) -> afw_image:
-        """ Retrieve image cutout specified in CIRCLE.
-
-        All input values in ICRS degrees, including the radius.
-
-        Parameters
-        ----------
-        params: `dict`
-            ID: <db>.<ds>.<filter>
-                    db: database identifier
-                    ds: dataset identifier
-                    filter: one of ( g, r, i, z, y )
-            POS: CIRCLE <longitude> <latitude> <radius>
-                longitude (ra) : `float`
-                latitude(dec): `float`
-                radius: `float`
-
-        Returns
-        -------
-        cutout : `lsst.afw.image`
-
-        """
-        cutout = get_image(params, self._config)
-        return cutout
-
-    def get_range(self, params: dict) -> afw_image:
-        """ Retrieve image cutout specified in RANGE.
-
-        All longitude(ra) and latitude(dec) values in ICRS degrees.
-
-        Parameters
-        ----------
-        params: 'dict'
-            ID: <db>.<ds>.<filter>
-                db: database identifier
-                ds: dataset identifier
-                filter: one of ( g, r, i, z, y )
-            POS: RANGE <longitude1> <longitude2> <latitude1> <latitude2>
-                longitude1(ra1) : `float`
-                longitude2(ra2): `float`
-                latitude1(dec1): `float`
-                latitude2(dec2): `float`
-
-        Returns
-        -------
-        cutout : `lsst.afw.image`
-
-        """
-        cutout = get_image(params, self._config)
-        return cutout
-
-    def get_polygon(self, params: dict) -> afw_image:
-        """ Retrieve image cutout as specified in POLYGON.
-
-        All contained ra and dec values in ICRS degrees.
-
-        Parameters
-        ----------
-        params: 'dict'
-            ID: <db>.<ds>.<filter>
-                db: database identifier
-                ds: dataset identifier
-                filter: one of ( g, r, i, z, y )
-            POS: POLYGON <longitude1> <latitude1> ... (at least 3 pairs)
-                longitude1: 'float'
-                latitude1: 'float'
-
-        Returns
-        -------
-        image : `lsst.afw.image`
-
-        """
-        cutout = get_image(params, self._config)
-        return cutout
-
-    def get_bbox(self, params: dict) -> afw_image:
-        """ Retrieve image cutout specified in BBOX,as LSST extension.
-
-        Parameters
-        ----------
-        params: `dict`
-            ID: <db>.<ds>.<filter>
-                db: database identifier
-                ds: dataset identifier
-                filter: one of ( g, r, i, z, y )
-            POS: BBOX <ra> <dec> <width> <height> <unit>
-                ra : `float`
-                    the longitude.
-                dec : `float`
-                    the latitude.
-                width: 'int'
-                    size of width.
-                height: `int`
-                    size of height.
-                unit: pixel, arcsec
-                    size in pixel or angular unit.
-
-        Returns
-        -------
-        cutout : `lsst.afw.image`
-i
-        """
-        cutout = get_image(params, self._config)
-        return cutout

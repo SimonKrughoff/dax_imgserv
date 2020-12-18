@@ -24,76 +24,104 @@ This module is used to locate and retrieve image datasets through the Butler.
 (e.g. raw, calexp, deepCoadd), and their related metadata.
 
 """
-
-import lsst.afw.image as afw_image
-
-from .getimage.imageget import ImageGetter
-from .butlerGet import ButlerGet
-from .metaGet import MetaGet
-from .dispatch import Dispatcher
-from .exceptions import UsageError
+from datetime import datetime
+import subprocess
 
 import etc.imgserv.imgserv_config as imgserv_config
+from lsst.lsst_soda_service.put_values import put_values
+from lsst.pipe.tasks.calexpCutout import CalexpCutoutTask
+from lsst.daf.butler import Butler
+import lsst.afw.image as afw_image
+
+from astropy.coordinates import SkyCoord
+from typing import List
 
 
-def open_image(ds, ds_type, config) -> ImageGetter:
-    """Open access to specified images (raw, calexp, deepCoadd,etc) of
-    specified image repository.
+def get_data_ids(datasetType: str, positions: List[SkyCoord]) -> List[dict]:
+    # This takes a list of positions just in case we want to do many at a time
+    # at some point
+    data_ids = []
+    for position in positions:
+        # Get the ids for the dataset type and the position of the cutout
+        # This could simply be another service, a call to a database,
+        # or a task operating on a repository
+        data_ids.append({'visit': 903332, 'detector': 20, 'instrument': 'HSC'})
+    return data_ids
 
-    Parameters
-    ----------
-
-    ds: `str`
-        the dataset identifier.
-    ds_type : `str`
-        the dataset type.
-    config: `dict`
-        the application configuration.
-
-    Returns
-    -------
-    imagegetter : `ImageGetter`
-        instance for access to all image operations.
-
+def get_calexp_bbox_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
     """
-    if ds == "default":
-        ds = imgserv_config.config_datasets["default"]
-    dataset = imgserv_config.config_datasets.get(ds, None)
-    if dataset is None:
-        raise UsageError("Invalid dataset id")
-    repo_root = dataset["IMG_REPO_ROOT"]
-    dataid_keys = config.get(ds_type, None)
-    if dataid_keys is None:
-        raise UsageError("Invalid dataset type")
-    butler_get = ButlerGet.get_butler(ds, repo_root, ds_type, dataid_keys)
-    meta_get = MetaGet(ds, config)
-    return ImageGetter(config, butler_get, meta_get)
-
-
-def get_image(params: dict, config: dict) -> afw_image:
-    """Get the image per query request synchronously (default).
-
-    Parameters
-    ----------
-    params : `dict`
-        the request parameters.
-    config : `dict`
-        the config file.
-
-    Returns
-    -------
-    image : afw_image
-        the requested image if found.
-
     """
-    dispatcher = Dispatcher(config["DAX_IMG_CONFIG"])
-    api, api_params = dispatcher.find_api(params)
-    ds = api_params.get("ds", None)
-    if ds is None:
-        raise UsageError("Missing dataset identifier")
-    ds_type = api_params.get("dsType", None)
-    if ds_type is None:
-        raise UsageError("Missing dsType parameter")
-    img_getter = open_image(ds, ds_type, config)
-    image = api(img_getter, api_params)
-    return image
+    if repository_id == "default":
+        repository_id = imgserv_config.config_datasets["default"]
+    if repository_id not in imgserv_config.config_datasets:
+        raise ValueError(f'Unrecognized repository name: {repository_id}')
+    instrument = imgserv_config.config_datasets[repository_id]['INSTRUMENT']
+    repository = imgserv_config.config_datasets[repository_id]['IMG_REPO_ROOT']
+    collection = imgserv_config.config_datasets[repository_id]['IMG_DEFAULT_COLLECTION']
+    creation_time = datetime.timestamp(datetime.now())
+    out_collection = f'imgserv_{creation_time}'
+    put_collection = f'imgserv_positions_{creation_time}'
+    position = SkyCoord(ra, dec, unit='deg')
+    data_id = get_data_ids('calexp', [position, ])[0]
+    visit = data_id['visit']
+    detector = data_id['detector']
+    # This assumes arc length not delta-RA
+    size = max([width, height])
+    # We will need to generalize this to take arbitrary data IDs
+    put_values(repository, visit, detector, instrument,
+               put_collection, ra=position.ra.degree, dec=position.dec.degree, size=size)
+    # Run the pipeline task: this should block for sync and not for async
+    # right now we'll just open a supbrocess
+    # The current pipeline task just does square cutouts
+    result = subprocess.run(['pipetask', 'run', '-j', '1', '-b', repository, '--register-dataset-types',
+                             '-t', 'lsst.pipe.tasks.calexpCutout.CalexpCutoutTask', '-d',
+                             f"visit={visit} AND detector={detector} AND instrument='{instrument}'", '--output', out_collection, '-i',
+                             f"{collection},{put_collection}"], capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f'Non zero return code encountered: {result.returncode}')
+    butler = Butler(repository, collections=[out_collection, ])
+    stamps = butler.get('calexp_cutouts', dataId=data_id)
+    # We know we only sent one position
+    return stamps[0].stamp_im
+
+def get_calexp_circle_image(repository_id: str, ra: float, dec: float, radius: float) -> afw_image:
+    pass
+
+def get_calexp_range_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+    pass
+
+def get_calexp_polygon_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+    pass
+
+def get_calexp_id_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+    pass
+
+def get_coadd_bbox_image(repository_id: str, ra: float, dec: float, radius: float) -> afw_image:
+    pass
+
+def get_coadd_circle_image(repository_id: str, ra: float, dec: float, radius: float) -> afw_image:
+    pass
+
+def get_coadd_range_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+    pass
+
+def get_coadd_polygon_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+    pass
+
+def get_coadd_id_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+    pass
+
+getter_map = {('calexp', 'BBOX'): get_calexp_bbox_image,
+              ('calexp', 'CIRCLE'): get_calexp_circle_image,
+              ('calexp', 'RANGE'): get_calexp_range_image,
+              ('calexp', 'POLYGON'): get_calexp_polygon_image,
+              ('calexp', 'ID'): get_calexp_id_image,
+              ('deepCoadd', 'BBOX'): get_coadd_bbox_image,
+              ('deepCoadd', 'CIRCLE'): get_coadd_circle_image,
+              ('deepCoadd', 'RANGE'): get_coadd_range_image,
+              ('deepCoadd', 'POLYGON'): get_coadd_polygon_image,
+              ('deepCoadd', 'ID'): get_coadd_id_image,
+             }
+
+def get_image(repository_id, datasetType, shape, *args):
+    return getter_map[(datasetType, shape)](repository_id, *args)
