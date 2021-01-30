@@ -38,7 +38,7 @@ config_datasets = {
         "deepCoadd": ["band", "skymap",  "tract", "patch"]
     },
     "hsc_rc2": {
-        "IMG_REPO_ROOT": "/Users/krughoff/projects/minikube/project/validation_hsc_gen3/",
+        "IMG_REPO_ROOT": "/project/validation_hsc_gen3/",
         "IMG_DEFAULT_COLLECTION": "shared/valid_hsc_all",
         "IMG_OBSCORE_DB": "lsstdb1",
         "IMG_SCHEMA_TABLE": "imgserv.obscore",

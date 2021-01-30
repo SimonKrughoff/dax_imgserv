@@ -87,8 +87,8 @@ class ImageSODA(DAL):
                 dataset_id = 'default'
                 band = 'default'
             else:
-                database, datasetType, band = params['ID'].split('.')
-            cutout = get_image(datasetType, params['POS'].split()[0], *params['POS'].split()[1:])
+                database, dataset_id, band = params['ID'].split('.')
+            cutout = get_image(database, dataset_id, params['POS'].split()[0], *params['POS'].split()[1:])
             return cutout
         else:
             raise NotImplementedError("ImageSODA.do_sync(): Unsupported "

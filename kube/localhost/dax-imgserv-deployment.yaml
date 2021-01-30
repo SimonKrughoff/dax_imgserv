@@ -36,7 +36,7 @@ spec:
           claimName: datasets-lsst-lsp-localhost-dax-claim
       initContainers:
         - name: set-secrets-ownership
-          image: webserv/imgserv:local
+          image: imgserv:with_soda
           command: ["sh"] 
           args: 
               - -c 
@@ -54,14 +54,14 @@ spec:
             mountPath: /etc/dax-imgserv
       containers:
       - name: dax-imgserv
-        image: webserv/imgserv:local
+        image: imgserv:with_soda
         imagePullPolicy: Never
         resources:
           requests:
-            memory: 500Mi
+            memory: 3Gi
             cpu: 1
           limits:
-            memory: 500Mi
+            memory: 3Gi
             cpu: 1
         env:
         - name: WEBSERV_CONFIG
@@ -75,8 +75,8 @@ spec:
           mountPath: /etc/dax-imgserv
           readOnly: true
         - name: project
-          mountPath: "/project/hsc/gen3repo"
-          readOnly: true
+          mountPath: "/project"
+          readOnly: false
         - name: datasets
           mountPath: "/datasets"
           readOnly: true

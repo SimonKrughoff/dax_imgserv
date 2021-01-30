@@ -3,6 +3,7 @@
 #
 source /opt/lsst/software/stack/loadLSST.bash
 setup lsst_distrib;
+setup -k -r /src/lsst-soda-service
 # Set home dir
 cd /home/lsst
 

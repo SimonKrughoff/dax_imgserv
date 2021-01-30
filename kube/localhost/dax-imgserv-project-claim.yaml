@@ -4,7 +4,7 @@ metadata:
   name: project-lsst-lsp-localhost-dax-claim
 spec:
   accessModes:
-  - ReadOnlyMany
+  - ReadWriteMany
   resources:
     requests:
       storage: 500Mi

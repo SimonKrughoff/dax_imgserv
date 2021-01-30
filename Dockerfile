@@ -1,4 +1,4 @@
-FROM lsstsqre/centos:7-stack-lsst_distrib-w_2020_42
+FROM lsstsqre/centos:7-stack-lsst_distrib-w_2021_04
 
 MAINTAINER Kenny Lo <kennylo@slac.stanford.edu>
 
@@ -19,23 +19,42 @@ RUN yum -y install redis
 
 # Setup Dependencies
 RUN /bin/bash -c 'source /opt/lsst/software/stack/loadLSST.bash; \
-    LDFLAGS=-fno-lto pip install uwsgi'
+    LDFLAGS=-fno-lto conda install uwsgi'
 
 # switch to lsst user
 USER lsst
 WORKDIR /app
 
-ADD requirements.txt .
+COPY requirements.txt .
 RUN /bin/bash -c 'source /opt/lsst/software/stack/loadLSST.bash; \
    pip install --no-cache-dir --user -r requirements.txt'
 
-# Add the code in
-ADD . /app
-# Add /etc
-ADD /rootfs /
+WORKDIR /src
+ADD https://github.com/lsst-sqre/lsst-soda-service/archive/v0.0.3.tar.gz .
+
+
+USER root
+RUN /bin/bash -c 'tar zxvf v0.0.3.tar.gz'
+RUN ln -s lsst-soda-service-0.0.3 lsst-soda-service
+RUN ls
+WORKDIR /src/lsst-soda-service
 
 RUN /bin/bash -c 'source /opt/lsst/software/stack/loadLSST.bash; \
    setup lsst_distrib; \
+   setup -k -r .; \
+   scons'
+
+USER lsst
+WORKDIR /app
+
+# Add the code in
+COPY . /app
+# Add /etc
+COPY /rootfs /
+
+RUN /bin/bash -c 'source /opt/lsst/software/stack/loadLSST.bash; \
+   setup lsst_distrib; \
+   setup -k -r /src/lsst-soda-service; \
    pip install --no-cache-dir --user .'
 
 USER root

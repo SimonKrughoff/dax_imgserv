@@ -4,10 +4,11 @@ metadata:
   name: project-lsst-lsp-localhost-dax
 spec:
   accessModes:
-  - ReadOnlyMany
+  - ReadWriteMany
   capacity:
     storage: 500Mi
   storageClassName: standard
   hostPath:
     path: /Users/krughoff/projects/minikube/project
+    type: Directory
   persistentVolumeReclaimPolicy: Retain

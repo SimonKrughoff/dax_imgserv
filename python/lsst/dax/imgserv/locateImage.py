@@ -48,9 +48,14 @@ def get_data_ids(datasetType: str, positions: List[SkyCoord]) -> List[dict]:
         data_ids.append({'visit': 903332, 'detector': 20, 'instrument': 'HSC'})
     return data_ids
 
-def get_calexp_bbox_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str) -> afw_image:
+def get_calexp_bbox_image(repository_id: str, ra: float, dec: float, width: float, height: float, unit: str = 'degrees') -> afw_image:
     """
     """
+    ra = float(ra)
+    dec = float(dec)
+    width = float(width)
+    height = float(height)
+    unit = str(unit)
     if repository_id == "default":
         repository_id = imgserv_config.config_datasets["default"]
     if repository_id not in imgserv_config.config_datasets:
